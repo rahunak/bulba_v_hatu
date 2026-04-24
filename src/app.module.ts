@@ -8,6 +8,7 @@ import { ClientBotModule } from './client-bot/client-bot.module';
 import { AdminBotModule } from './admin-bot/admin-bot.module';
 import { BotLauncherService } from './common/services/bot-launcher.service';
 import { OrderExpirationService } from './common/services/order-expiration.service';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { OrderExpirationService } from './common/services/order-expiration.servi
     ClientBotModule,
     AdminBotModule,
   ],
+  controllers: [AppController],
   providers: [BotLauncherService, OrderExpirationService],
 })
 export class AppModule {}
