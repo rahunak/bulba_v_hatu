@@ -23,7 +23,7 @@ export class AppController {
     const uptime = process.uptime();
     const uptimeFormatted = `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.floor(uptime % 60)}s`;
 
-    let products = [];
+    let products: Array<{ name: string; stock: number; price: number }> = [];
     try {
       products = await this.prisma.product.findMany({
         where: { stock: { gt: 0 } },
@@ -59,7 +59,8 @@ export class AppController {
       await this.prisma.$queryRaw`SELECT 1`;
       return { status: 'ok', database: 'connected' };
     } catch (error) {
-      return { status: 'error', database: 'disconnected', error: error.message };
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return { status: 'error', database: 'disconnected', error: errorMessage };
     }
   }
 }
