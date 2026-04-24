@@ -158,6 +158,88 @@ describe('ClientBotUpdate', () => {
       expect(mockCtx.session.cart).toHaveLength(1);
       expect(mockCtx.session.cart[0].quantity).toBe(3);
     });
+
+    it('should update message text after adding to cart', async () => {
+      const mockCtx = {
+        callbackQuery: {
+          data: 'add_uuid-1',
+          message: {},
+        },
+        session: { cart: [] },
+        answerCbQuery: jest.fn(),
+        editMessageText: jest.fn(),
+        editMessageCaption: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        name: 'Помидоры',
+        price: 3.5,
+        stock: 100,
+        photoId: null,
+      });
+
+      await clientBotUpdate.onAddToCart(mockCtx);
+
+      expect(mockCtx.editMessageText).toHaveBeenCalledWith(
+        expect.stringContaining('В корзине: 1 шт'),
+        expect.any(Object),
+      );
+    });
+
+    it('should update message caption for photo after adding to cart', async () => {
+      const mockCtx = {
+        callbackQuery: {
+          data: 'add_uuid-1',
+          message: {},
+        },
+        session: { cart: [] },
+        answerCbQuery: jest.fn(),
+        editMessageText: jest.fn(),
+        editMessageCaption: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        name: 'Помидоры',
+        price: 3.5,
+        stock: 100,
+        photoId: 'photo-123',
+      });
+
+      await clientBotUpdate.onAddToCart(mockCtx);
+
+      expect(mockCtx.editMessageCaption).toHaveBeenCalledWith(
+        expect.stringContaining('В корзине: 1 шт'),
+        expect.any(Object),
+      );
+    });
+
+    it('should show +/- buttons after adding to cart', async () => {
+      const mockCtx = {
+        callbackQuery: {
+          data: 'add_uuid-1',
+          message: {},
+        },
+        session: { cart: [{ productId: 'uuid-1', quantity: 1 }] },
+        answerCbQuery: jest.fn(),
+        editMessageText: jest.fn(),
+        editMessageCaption: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        name: 'Помидоры',
+        price: 3.5,
+        stock: 100,
+        photoId: null,
+      });
+
+      await clientBotUpdate.onAddToCart(mockCtx);
+
+      const callArgs = mockCtx.editMessageText.mock.calls[0];
+      expect(callArgs[1]).toHaveProperty('reply_markup');
+    });
   });
 
   describe('onCheckout', () => {
@@ -232,6 +314,144 @@ describe('ClientBotUpdate', () => {
     });
   });
 
+  describe('onRemoveFromCart', () => {
+    it('should decrease quantity when more than 1', async () => {
+      const mockCtx = {
+        callbackQuery: {
+          data: 'remove_uuid-1',
+          message: {},
+        },
+        session: { cart: [{ productId: 'uuid-1', quantity: 3 }] },
+        answerCbQuery: jest.fn(),
+        editMessageText: jest.fn(),
+        editMessageCaption: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        name: 'Помидоры',
+        price: 3.5,
+        stock: 100,
+        photoId: null,
+      });
+
+      await clientBotUpdate.onRemoveFromCart(mockCtx);
+
+      expect(mockCtx.session.cart[0].quantity).toBe(2);
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('✅ Товар удален из корзины');
+    });
+
+    it('should remove item when quantity is 1', async () => {
+      const mockCtx = {
+        callbackQuery: {
+          data: 'remove_uuid-1',
+          message: {},
+        },
+        session: { cart: [{ productId: 'uuid-1', quantity: 1 }] },
+        answerCbQuery: jest.fn(),
+        editMessageText: jest.fn(),
+        editMessageCaption: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        name: 'Помидоры',
+        price: 3.5,
+        stock: 100,
+        photoId: null,
+      });
+
+      await clientBotUpdate.onRemoveFromCart(mockCtx);
+
+      expect(mockCtx.session.cart).toEqual([]);
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('✅ Товар удален из корзины');
+    });
+
+    it('should update message with new buttons after removal', async () => {
+      const mockCtx = {
+        callbackQuery: {
+          data: 'remove_uuid-1',
+          message: {},
+        },
+        session: { cart: [{ productId: 'uuid-1', quantity: 2 }] },
+        answerCbQuery: jest.fn(),
+        editMessageText: jest.fn(),
+        editMessageCaption: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        name: 'Помидоры',
+        price: 3.5,
+        stock: 100,
+        photoId: null,
+      });
+
+      await clientBotUpdate.onRemoveFromCart(mockCtx);
+
+      expect(mockCtx.editMessageText).toHaveBeenCalledWith(
+        expect.stringContaining('Помидоры'),
+        expect.any(Object),
+      );
+    });
+
+    it('should update photo message caption after removal', async () => {
+      const mockCtx = {
+        callbackQuery: {
+          data: 'remove_uuid-1',
+          message: {},
+        },
+        session: { cart: [{ productId: 'uuid-1', quantity: 2 }] },
+        answerCbQuery: jest.fn(),
+        editMessageText: jest.fn(),
+        editMessageCaption: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        name: 'Помидоры',
+        price: 3.5,
+        stock: 100,
+        photoId: 'photo-123',
+      });
+
+      await clientBotUpdate.onRemoveFromCart(mockCtx);
+
+      expect(mockCtx.editMessageCaption).toHaveBeenCalledWith(
+        expect.stringContaining('Помидоры'),
+        expect.any(Object),
+      );
+    });
+
+    it('should show "Add to cart" button when item fully removed', async () => {
+      const mockCtx = {
+        callbackQuery: {
+          data: 'remove_uuid-1',
+          message: {},
+        },
+        session: { cart: [{ productId: 'uuid-1', quantity: 1 }] },
+        answerCbQuery: jest.fn(),
+        editMessageText: jest.fn(),
+        editMessageCaption: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        name: 'Помидоры',
+        price: 3.5,
+        stock: 100,
+        photoId: null,
+      });
+
+      await clientBotUpdate.onRemoveFromCart(mockCtx);
+
+      expect(mockCtx.editMessageText).toHaveBeenCalledWith(
+        expect.not.stringContaining('В корзине'),
+        expect.any(Object),
+      );
+    });
+  });
+
   describe('onContact', () => {
     it('should save phone and ask for address', async () => {
       const mockCtx = {
@@ -259,6 +479,7 @@ describe('ClientBotUpdate', () => {
     it('should show catalog when "📦 Каталог товаров" is clicked', async () => {
       const mockCtx = {
         message: { text: '📦 Каталог товаров' },
+        session: {},
         reply: jest.fn(),
         replyWithPhoto: jest.fn(),
       } as any;
@@ -373,6 +594,119 @@ describe('ClientBotUpdate', () => {
       expect(mockCtx.session.orderStep).toBeUndefined();
       expect(mockCtx.session.cart).toEqual([]);
     });
+
+    it('should handle error when telegramId is missing during address input', async () => {
+      const mockCtx = {
+        from: undefined,
+        message: { text: 'Минск, ул. Ленина 1' },
+        session: {
+          orderStep: 'awaiting_address',
+          cart: [{ productId: 'uuid-1', quantity: 2 }],
+        },
+        reply: jest.fn(),
+      } as any;
+
+      await clientBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith('Ошибка при оформлении заказа.');
+    });
+
+    it('should handle error when cart is empty during address input', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: 'Минск, ул. Ленина 1' },
+        session: {
+          orderStep: 'awaiting_address',
+          cart: [],
+        },
+        reply: jest.fn(),
+      } as any;
+
+      await clientBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith('Ошибка при оформлении заказа.');
+    });
+
+    it('should handle error when user not found during address input', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: 'Минск, ул. Ленина 1' },
+        session: {
+          orderStep: 'awaiting_address',
+          cart: [{ productId: 'uuid-1', quantity: 2 }],
+        },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue(null);
+
+      await clientBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith('Пользователь не найден.');
+    });
+
+    it('should handle error when product is out of stock during order', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: 'Минск, ул. Ленина 1' },
+        session: {
+          orderStep: 'awaiting_address',
+          cart: [{ productId: 'uuid-1', quantity: 10 }],
+        },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'user-uuid-1',
+        telegramId: '123456',
+      });
+
+      mockPrismaService.product.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        name: 'Помидоры',
+        price: 3.5,
+        stock: 5,
+      });
+
+      await clientBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith('Товар Помидоры недоступен в нужном количестве.');
+    });
+
+    it('should handle database error during order creation', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: 'Минск, ул. Ленина 1' },
+        session: {
+          orderStep: 'awaiting_address',
+          cart: [{ productId: 'uuid-1', quantity: 2 }],
+        },
+        chat: { id: 123456 },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'user-uuid-1',
+        telegramId: '123456',
+      });
+
+      mockPrismaService.product.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        name: 'Помидоры',
+        price: 3.5,
+        stock: 100,
+      });
+
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+      mockPrismaService.$transaction.mockRejectedValue(new Error('Database error'));
+
+      await clientBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith('Произошла ошибка при оформлении заказа. Попробуйте позже.');
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Order creation error:', expect.any(Error));
+
+      consoleErrorSpy.mockRestore();
+    });
   });
 
   describe('showCatalog', () => {
@@ -394,6 +728,7 @@ describe('ClientBotUpdate', () => {
     it('should show product with photo', async () => {
       const mockCtx = {
         message: { text: '📦 Каталог товаров' },
+        session: {},
         reply: jest.fn(),
         replyWithPhoto: jest.fn(),
       } as any;
@@ -417,6 +752,86 @@ describe('ClientBotUpdate', () => {
           caption: expect.stringContaining('Помидоры'),
         }),
       );
+    });
+
+    it('should show "Add to cart" button when product not in cart', async () => {
+      const mockCtx = {
+        message: { text: '📦 Каталог товаров' },
+        session: { cart: [] },
+        reply: jest.fn(),
+        replyWithPhoto: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findMany.mockResolvedValue([
+        {
+          id: 'uuid-1',
+          name: 'Помидоры',
+          price: 3.5,
+          stock: 100,
+          isActive: true,
+          photoId: null,
+        },
+      ]);
+
+      await clientBotUpdate.onText(mockCtx);
+
+      const callArgs = mockCtx.reply.mock.calls[0];
+      expect(callArgs[1]).toHaveProperty('reply_markup');
+      expect(callArgs[1].reply_markup.inline_keyboard[0][0].text).toBe('➕ Добавить в корзину');
+    });
+
+    it('should show +/- buttons when product is in cart', async () => {
+      const mockCtx = {
+        message: { text: '📦 Каталог товаров' },
+        session: { cart: [{ productId: 'uuid-1', quantity: 2 }] },
+        reply: jest.fn(),
+        replyWithPhoto: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findMany.mockResolvedValue([
+        {
+          id: 'uuid-1',
+          name: 'Помидоры',
+          price: 3.5,
+          stock: 100,
+          isActive: true,
+          photoId: null,
+        },
+      ]);
+
+      await clientBotUpdate.onText(mockCtx);
+
+      const callArgs = mockCtx.reply.mock.calls[0];
+      expect(callArgs[0]).toContain('В корзине: 2 шт');
+      expect(callArgs[1].reply_markup.inline_keyboard[0]).toHaveLength(3);
+      expect(callArgs[1].reply_markup.inline_keyboard[0][0].text).toBe('➖');
+      expect(callArgs[1].reply_markup.inline_keyboard[0][1].text).toBe('2 шт');
+      expect(callArgs[1].reply_markup.inline_keyboard[0][2].text).toBe('➕');
+    });
+
+    it('should show cart quantity in product description', async () => {
+      const mockCtx = {
+        message: { text: '📦 Каталог товаров' },
+        session: { cart: [{ productId: 'uuid-1', quantity: 5 }] },
+        reply: jest.fn(),
+        replyWithPhoto: jest.fn(),
+      } as any;
+
+      mockPrismaService.product.findMany.mockResolvedValue([
+        {
+          id: 'uuid-1',
+          name: 'Помидоры',
+          price: 3.5,
+          stock: 100,
+          isActive: true,
+          photoId: null,
+        },
+      ]);
+
+      await clientBotUpdate.onText(mockCtx);
+
+      const callArgs = mockCtx.reply.mock.calls[0];
+      expect(callArgs[0]).toContain('🛒 В корзине: 5 шт');
     });
   });
 

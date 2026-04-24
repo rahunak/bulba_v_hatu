@@ -13,6 +13,7 @@ export interface SessionData {
     price?: number;
     stock?: number;
   };
+  addingAdmin?: boolean;
   [key: string]: unknown;
 }
 

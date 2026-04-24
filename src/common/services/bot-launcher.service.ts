@@ -1,10 +1,12 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectBot } from 'nestjs-telegraf';
 import { Telegraf } from 'telegraf';
 import { BotContext } from '../interfaces/bot-context.interface';
 
 @Injectable()
 export class BotLauncherService implements OnModuleInit {
+  private readonly logger = new Logger(BotLauncherService.name);
+
   constructor(
     @InjectBot('client')
     private readonly clientBot: Telegraf<BotContext>,
@@ -13,31 +15,33 @@ export class BotLauncherService implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    console.log('Starting bots in polling mode...');
+    this.logger.log('[STARTUP] Starting bots in polling mode...');
 
     // Запускаем боты асинхронно без ожидания
     this.clientBot.launch({
       dropPendingUpdates: true,
     }).then(() => {
-      console.log('Client bot started successfully');
+      this.logger.log('[STARTUP] Client bot started successfully');
     }).catch((error) => {
-      console.error('Failed to start client bot:', error);
+      this.logger.error('[STARTUP] Failed to start client bot:', error);
     });
 
     this.adminBot.launch({
       dropPendingUpdates: true,
     }).then(() => {
-      console.log('Admin bot started successfully');
+      this.logger.log('[STARTUP] Admin bot started successfully');
     }).catch((error) => {
-      console.error('Failed to start admin bot:', error);
+      this.logger.error('[STARTUP] Failed to start admin bot:', error);
     });
 
     // Graceful shutdown
     process.once('SIGINT', () => {
+      this.logger.log('[SHUTDOWN] Received SIGINT, stopping bots...');
       this.clientBot.stop('SIGINT');
       this.adminBot.stop('SIGINT');
     });
     process.once('SIGTERM', () => {
+      this.logger.log('[SHUTDOWN] Received SIGTERM, stopping bots...');
       this.clientBot.stop('SIGTERM');
       this.adminBot.stop('SIGTERM');
     });

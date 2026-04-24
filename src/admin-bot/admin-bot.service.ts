@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectBot } from 'nestjs-telegraf';
 import { Telegraf, Markup } from 'telegraf';
 import { BotContext } from '../common/interfaces/bot-context.interface';
@@ -6,6 +6,8 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AdminBotService {
+  private readonly logger = new Logger(AdminBotService.name);
+
   constructor(
     @InjectBot('admin')
     private readonly bot: Telegraf<BotContext>,
@@ -13,6 +15,8 @@ export class AdminBotService {
   ) {}
 
   async notifyNewOrder(orderId: string): Promise<void> {
+    this.logger.log(`[NOTIFY] Notifying admins about new order ${orderId}`);
+
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -25,11 +29,16 @@ export class AdminBotService {
       },
     });
 
-    if (!order) return;
+    if (!order) {
+      this.logger.warn(`[NOTIFY] Order ${orderId} not found`);
+      return;
+    }
 
     const admins = await this.prisma.user.findMany({
       where: { role: 'ADMIN' },
     });
+
+    this.logger.log(`[NOTIFY] Found ${admins.length} admins to notify about order ${orderId}`);
 
     let orderText = `🔔 Новый заказ #${order.id.slice(0, 8)}\n\n`;
     orderText += `👤 Клиент: ${order.user.username || 'Без имени'}\n`;
@@ -53,13 +62,21 @@ export class AdminBotService {
     for (const admin of admins) {
       try {
         await this.bot.telegram.sendMessage(admin.telegramId, orderText, buttons);
+        this.logger.log(`[NOTIFY] Successfully notified admin ${admin.telegramId} about order ${orderId}`);
       } catch (error) {
-        console.error(`Failed to notify admin ${admin.telegramId}:`, error);
+        this.logger.error(`[NOTIFY] Failed to notify admin ${admin.telegramId} about order ${orderId}:`, error);
       }
     }
   }
 
   async sendMessage(chatId: string, text: string, extra?: object): Promise<void> {
-    await this.bot.telegram.sendMessage(chatId, text, extra);
+    this.logger.log(`[MESSAGE] Sending message to chat ${chatId}`);
+    try {
+      await this.bot.telegram.sendMessage(chatId, text, extra);
+      this.logger.log(`[MESSAGE] Message sent successfully to chat ${chatId}`);
+    } catch (error) {
+      this.logger.error(`[MESSAGE] Failed to send message to chat ${chatId}:`, error);
+      throw error;
+    }
   }
 }

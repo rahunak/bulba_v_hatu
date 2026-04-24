@@ -11,9 +11,11 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const nestjs_telegraf_1 = require("nestjs-telegraf");
 const prisma_module_1 = require("./prisma/prisma.module");
+const session_module_1 = require("./common/middleware/session.module");
 const session_middleware_1 = require("./common/middleware/session.middleware");
 const client_bot_module_1 = require("./client-bot/client-bot.module");
 const admin_bot_module_1 = require("./admin-bot/admin-bot.module");
+const bot_launcher_service_1 = require("./common/services/bot-launcher.service");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -22,17 +24,14 @@ exports.AppModule = AppModule = __decorate([
         imports: [
             config_1.ConfigModule.forRoot({ isGlobal: true }),
             prisma_module_1.PrismaModule,
+            session_module_1.SessionModule,
             nestjs_telegraf_1.TelegrafModule.forRootAsync({
                 botName: 'client',
                 useFactory: (config, sessionMiddleware) => ({
                     token: config.get('CLIENT_BOT_TOKEN') || '',
                     middlewares: [sessionMiddleware.middleware()],
-                    launchOptions: {
-                        webhook: {
-                            domain: config.get('RENDER_BACKEND_URL') || '',
-                            hookPath: '/webhook/client',
-                        },
-                    },
+                    launchOptions: false,
+                    include: [client_bot_module_1.ClientBotModule],
                 }),
                 inject: [config_1.ConfigService, session_middleware_1.SessionMiddleware],
             }),
@@ -41,19 +40,15 @@ exports.AppModule = AppModule = __decorate([
                 useFactory: (config, sessionMiddleware) => ({
                     token: config.get('ADMIN_BOT_TOKEN') || '',
                     middlewares: [sessionMiddleware.middleware()],
-                    launchOptions: {
-                        webhook: {
-                            domain: config.get('RENDER_BACKEND_URL') || '',
-                            hookPath: '/webhook/admin',
-                        },
-                    },
+                    launchOptions: false,
+                    include: [admin_bot_module_1.AdminBotModule],
                 }),
                 inject: [config_1.ConfigService, session_middleware_1.SessionMiddleware],
             }),
             client_bot_module_1.ClientBotModule,
             admin_bot_module_1.AdminBotModule,
         ],
-        providers: [session_middleware_1.SessionMiddleware],
+        providers: [bot_launcher_service_1.BotLauncherService],
     })
 ], AppModule);
 //# sourceMappingURL=app.module.js.map

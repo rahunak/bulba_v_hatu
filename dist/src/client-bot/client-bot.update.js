@@ -87,11 +87,26 @@ let ClientBotUpdate = class ClientBotUpdate {
             await ctx.reply('К сожалению, товары временно отсутствуют.');
             return;
         }
+        const cart = ctx.session.cart || [];
         for (const product of products) {
-            const buttons = telegraf_1.Markup.inlineKeyboard([
-                telegraf_1.Markup.button.callback('➕ Добавить в корзину', `add_${product.id}`),
-            ]);
-            const text = `${product.name}\n💰 Цена: ${product.price} BYN\n📦 В наличии: ${product.stock} шт.`;
+            const cartItem = cart.find((item) => item.productId === product.id);
+            let buttons;
+            let text = `${product.name}\n💰 Цена: ${product.price} BYN\n📦 В наличии: ${product.stock} шт.`;
+            if (cartItem) {
+                text += `\n🛒 В корзине: ${cartItem.quantity} шт.`;
+                buttons = telegraf_1.Markup.inlineKeyboard([
+                    [
+                        telegraf_1.Markup.button.callback('➖', `remove_${product.id}`),
+                        telegraf_1.Markup.button.callback(`${cartItem.quantity} шт`, `quantity_${product.id}`),
+                        telegraf_1.Markup.button.callback('➕', `add_${product.id}`),
+                    ],
+                ]);
+            }
+            else {
+                buttons = telegraf_1.Markup.inlineKeyboard([
+                    telegraf_1.Markup.button.callback('➕ Добавить в корзину', `add_${product.id}`),
+                ]);
+            }
             if (product.photoId) {
                 await ctx.replyWithPhoto(product.photoId, { caption: text, ...buttons });
             }
@@ -227,50 +242,124 @@ let ClientBotUpdate = class ClientBotUpdate {
             await ctx.reply('Произошла ошибка при оформлении заказа. Попробуйте позже.');
         }
     }
-    async onCallbackQuery(ctx) {
+    async onAddToCart(ctx) {
         const callbackQuery = ctx.callbackQuery;
         if (!callbackQuery || !('data' in callbackQuery))
             return;
-        const data = callbackQuery.data;
-        if (data.startsWith('add_')) {
-            const productId = data.replace('add_', '');
-            ctx.session.cart = ctx.session.cart || [];
-            const existingItem = ctx.session.cart.find((item) => item.productId === productId);
-            if (existingItem) {
-                existingItem.quantity += 1;
+        const productId = callbackQuery.data.replace('add_', '');
+        ctx.session.cart = ctx.session.cart || [];
+        const existingItem = ctx.session.cart.find((item) => item.productId === productId);
+        if (existingItem) {
+            existingItem.quantity += 1;
+        }
+        else {
+            ctx.session.cart.push({ productId, quantity: 1 });
+        }
+        await ctx.answerCbQuery('✅ Товар добавлен в корзину');
+        const product = await this.prisma.product.findUnique({
+            where: { id: productId },
+        });
+        if (product && 'message' in callbackQuery) {
+            const cartItem = ctx.session.cart.find((item) => item.productId === productId);
+            let text = `${product.name}\n💰 Цена: ${product.price} BYN\n📦 В наличии: ${product.stock} шт.`;
+            if (cartItem) {
+                text += `\n🛒 В корзине: ${cartItem.quantity} шт.`;
+            }
+            const buttons = telegraf_1.Markup.inlineKeyboard([
+                [
+                    telegraf_1.Markup.button.callback('➖', `remove_${product.id}`),
+                    telegraf_1.Markup.button.callback(`${cartItem?.quantity || 0} шт`, `quantity_${product.id}`),
+                    telegraf_1.Markup.button.callback('➕', `add_${product.id}`),
+                ],
+            ]);
+            try {
+                if (product.photoId) {
+                    await ctx.editMessageCaption(text, buttons);
+                }
+                else {
+                    await ctx.editMessageText(text, buttons);
+                }
+            }
+            catch (error) {
+            }
+        }
+    }
+    async onRemoveFromCart(ctx) {
+        const callbackQuery = ctx.callbackQuery;
+        if (!callbackQuery || !('data' in callbackQuery))
+            return;
+        const productId = callbackQuery.data.replace('remove_', '');
+        ctx.session.cart = ctx.session.cart || [];
+        const existingItem = ctx.session.cart.find((item) => item.productId === productId);
+        if (existingItem) {
+            if (existingItem.quantity > 1) {
+                existingItem.quantity -= 1;
             }
             else {
-                ctx.session.cart.push({ productId, quantity: 1 });
+                ctx.session.cart = ctx.session.cart.filter((item) => item.productId !== productId);
             }
-            await ctx.answerCbQuery('✅ Товар добавлен в корзину');
         }
-        else if (data === 'checkout') {
-            const cart = ctx.session.cart || [];
-            if (cart.length === 0) {
-                await ctx.answerCbQuery('Корзина пуста');
-                return;
-            }
-            const telegramId = ctx.from?.id.toString();
-            if (!telegramId)
-                return;
-            const user = await this.prisma.user.findUnique({
-                where: { telegramId },
-            });
-            if (!user?.phone) {
-                ctx.session.orderStep = 'awaiting_phone';
-                await ctx.reply('📞 Для оформления заказа поделитесь номером телефона:', telegraf_1.Markup.keyboard([telegraf_1.Markup.button.contactRequest('📱 Отправить номер')]).resize());
+        await ctx.answerCbQuery('✅ Товар удален из корзины');
+        const product = await this.prisma.product.findUnique({
+            where: { id: productId },
+        });
+        if (product && 'message' in callbackQuery) {
+            const cartItem = ctx.session.cart.find((item) => item.productId === productId);
+            let text = `${product.name}\n💰 Цена: ${product.price} BYN\n📦 В наличии: ${product.stock} шт.`;
+            let buttons;
+            if (cartItem) {
+                text += `\n🛒 В корзине: ${cartItem.quantity} шт.`;
+                buttons = telegraf_1.Markup.inlineKeyboard([
+                    [
+                        telegraf_1.Markup.button.callback('➖', `remove_${product.id}`),
+                        telegraf_1.Markup.button.callback(`${cartItem.quantity} шт`, `quantity_${product.id}`),
+                        telegraf_1.Markup.button.callback('➕', `add_${product.id}`),
+                    ],
+                ]);
             }
             else {
-                ctx.session.orderStep = 'awaiting_address';
-                await ctx.reply('📍 Введите адрес доставки в Минске:', telegraf_1.Markup.removeKeyboard());
+                buttons = telegraf_1.Markup.inlineKeyboard([
+                    telegraf_1.Markup.button.callback('➕ Добавить в корзину', `add_${product.id}`),
+                ]);
             }
-            await ctx.answerCbQuery();
+            try {
+                if (product.photoId) {
+                    await ctx.editMessageCaption(text, buttons);
+                }
+                else {
+                    await ctx.editMessageText(text, buttons);
+                }
+            }
+            catch (error) {
+            }
         }
-        else if (data === 'clear_cart') {
-            ctx.session.cart = [];
-            await ctx.answerCbQuery('🗑 Корзина очищена');
-            await ctx.editMessageText('🛒 Корзина очищена.');
+    }
+    async onCheckout(ctx) {
+        const cart = ctx.session.cart || [];
+        if (cart.length === 0) {
+            await ctx.answerCbQuery('Корзина пуста');
+            return;
         }
+        const telegramId = ctx.from?.id.toString();
+        if (!telegramId)
+            return;
+        const user = await this.prisma.user.findUnique({
+            where: { telegramId },
+        });
+        if (!user?.phone) {
+            ctx.session.orderStep = 'awaiting_phone';
+            await ctx.reply('📞 Для оформления заказа поделитесь номером телефона:', telegraf_1.Markup.keyboard([telegraf_1.Markup.button.contactRequest('📱 Отправить номер')]).resize());
+        }
+        else {
+            ctx.session.orderStep = 'awaiting_address';
+            await ctx.reply('📍 Введите адрес доставки в Минске:', telegraf_1.Markup.removeKeyboard());
+        }
+        await ctx.answerCbQuery();
+    }
+    async onClearCart(ctx) {
+        ctx.session.cart = [];
+        await ctx.answerCbQuery('🗑 Корзина очищена');
+        await ctx.editMessageText('🛒 Корзина очищена.');
     }
 };
 exports.ClientBotUpdate = ClientBotUpdate;
@@ -293,11 +382,29 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], ClientBotUpdate.prototype, "onContact", null);
 __decorate([
-    (0, nestjs_telegraf_1.On)('callback_query'),
+    (0, nestjs_telegraf_1.Action)(/^add_/),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
-], ClientBotUpdate.prototype, "onCallbackQuery", null);
+], ClientBotUpdate.prototype, "onAddToCart", null);
+__decorate([
+    (0, nestjs_telegraf_1.Action)(/^remove_/),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], ClientBotUpdate.prototype, "onRemoveFromCart", null);
+__decorate([
+    (0, nestjs_telegraf_1.Action)('checkout'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], ClientBotUpdate.prototype, "onCheckout", null);
+__decorate([
+    (0, nestjs_telegraf_1.Action)('clear_cart'),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], ClientBotUpdate.prototype, "onClearCart", null);
 exports.ClientBotUpdate = ClientBotUpdate = __decorate([
     (0, nestjs_telegraf_1.Update)(),
     __param(0, (0, nestjs_telegraf_1.InjectBot)('client')),

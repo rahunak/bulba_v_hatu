@@ -16,5 +16,8 @@ export declare class ClientBotUpdate {
     private showCart;
     private showOrders;
     private handleAddress;
-    onCallbackQuery(ctx: BotContext): Promise<void>;
+    onAddToCart(ctx: BotContext): Promise<void>;
+    onRemoveFromCart(ctx: BotContext): Promise<void>;
+    onCheckout(ctx: BotContext): Promise<void>;
+    onClearCart(ctx: BotContext): Promise<void>;
 }

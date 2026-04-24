@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BotContext, SessionData } from '../interfaces/bot-context.interface';
 
 @Injectable()
 export class SessionMiddleware {
+  private readonly logger = new Logger(SessionMiddleware.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   middleware() {
@@ -19,6 +21,7 @@ export class SessionMiddleware {
       });
 
       if (!sessionRecord) {
+        this.logger.log(`[SESSION] Creating new session for user ${telegramId}`);
         try {
           sessionRecord = await this.prisma.session.create({
             data: {
@@ -26,12 +29,15 @@ export class SessionMiddleware {
               sessionData: {},
             },
           });
+          this.logger.log(`[SESSION] Session created successfully for user ${telegramId}`);
         } catch (error: any) {
           if (error.code === 'P2002') {
+            this.logger.warn(`[SESSION] Race condition detected for user ${telegramId}, fetching existing session`);
             sessionRecord = await this.prisma.session.findUnique({
               where: { telegramId },
             });
           } else {
+            this.logger.error(`[SESSION] Failed to create session for user ${telegramId}:`, error);
             throw error;
           }
         }

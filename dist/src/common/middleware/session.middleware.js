@@ -27,14 +27,26 @@ let SessionMiddleware = class SessionMiddleware {
                 where: { telegramId },
             });
             if (!sessionRecord) {
-                sessionRecord = await this.prisma.session.create({
-                    data: {
-                        telegramId,
-                        sessionData: {},
-                    },
-                });
+                try {
+                    sessionRecord = await this.prisma.session.create({
+                        data: {
+                            telegramId,
+                            sessionData: {},
+                        },
+                    });
+                }
+                catch (error) {
+                    if (error.code === 'P2002') {
+                        sessionRecord = await this.prisma.session.findUnique({
+                            where: { telegramId },
+                        });
+                    }
+                    else {
+                        throw error;
+                    }
+                }
             }
-            ctx.session = sessionRecord.sessionData || {};
+            ctx.session = sessionRecord?.sessionData || {};
             await next();
             await this.prisma.session.update({
                 where: { telegramId },

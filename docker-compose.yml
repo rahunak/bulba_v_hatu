@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: veggie_bot_db
     restart: unless-stopped
     environment:
@@ -10,7 +10,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
 
   app:
     build:
@@ -26,6 +26,7 @@ services:
       ADMIN_BOT_TOKEN: ${ADMIN_BOT_TOKEN}
       RENDER_BACKEND_URL: ${RENDER_BACKEND_URL}
       TELEGRAM_API_URL: https://api.telegram.org
+      ADMIN_WHITELIST: ${ADMIN_WHITELIST}
     ports:
       - "3000:3000"
 

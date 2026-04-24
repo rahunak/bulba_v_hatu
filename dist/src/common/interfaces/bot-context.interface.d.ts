@@ -7,6 +7,14 @@ export interface SessionData {
     orderStep?: string;
     phone?: string;
     address?: string;
+    editingProduct?: string;
+    editingField?: 'price' | 'stock';
+    addingProduct?: {
+        step: 'name' | 'price' | 'stock';
+        name?: string;
+        price?: number;
+        stock?: number;
+    };
     [key: string]: unknown;
 }
 export interface BotContext extends TelegrafContext {

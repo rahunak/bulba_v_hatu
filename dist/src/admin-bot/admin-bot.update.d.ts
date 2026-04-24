@@ -18,9 +18,23 @@ export declare class AdminBotUpdate {
     onStart(ctx: BotContext): Promise<void>;
     onStockCommand(ctx: BotContext): Promise<void>;
     onText(ctx: BotContext): Promise<void>;
+    private handleProductEdit;
+    private startAddingProduct;
+    private handleProductAdd;
+    private showStockList;
+    private showAcceptedOrders;
+    private showCancelledOrders;
+    private showProductsForEdit;
     private showActiveOrders;
     private showProducts;
-    onCallbackQuery(ctx: BotContext): Promise<void>;
+    onAcceptOrder(ctx: BotContext): Promise<void>;
+    onCancelOrder(ctx: BotContext): Promise<void>;
+    onCompleteOrder(ctx: BotContext): Promise<void>;
+    onToggleProduct(ctx: BotContext): Promise<void>;
+    onAddStock(ctx: BotContext): Promise<void>;
+    onRemoveStock(ctx: BotContext): Promise<void>;
+    onEditPrice(ctx: BotContext): Promise<void>;
+    onEditStock(ctx: BotContext): Promise<void>;
     private handleOrderAction;
     private handleToggleProduct;
 }

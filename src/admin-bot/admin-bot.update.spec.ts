@@ -22,6 +22,7 @@ describe('AdminBotUpdate', () => {
       findMany: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      create: jest.fn(),
     },
     order: {
       findMany: jest.fn(),
@@ -175,6 +176,25 @@ describe('AdminBotUpdate', () => {
       expect(mockCtx.reply).toHaveBeenCalledWith(expect.stringContaining('Огурцы'));
     });
 
+    it('should show empty message when no products', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      mockPrismaService.product.findMany.mockResolvedValue([]);
+
+      await adminBotUpdate.onStockCommand(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith('Товары отсутствуют.');
+    });
+
     it('should deny access for non-admin', async () => {
       const mockCtx = {
         from: { id: 123456 },
@@ -246,6 +266,26 @@ describe('AdminBotUpdate', () => {
 
       expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('❌ Нет доступа');
     });
+
+    it('should handle order not found', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        callbackQuery: { data: 'accept_order-uuid-1' },
+        answerCbQuery: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      mockPrismaService.order.findUnique.mockResolvedValue(null);
+
+      await adminBotUpdate.onAcceptOrder(mockCtx);
+
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('Заказ не найден');
+    });
   });
 
   describe('onCancelOrder', () => {
@@ -282,6 +322,24 @@ describe('AdminBotUpdate', () => {
         'CANCELLED',
       );
       expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('❌ Заказ отменен');
+    });
+
+    it('should deny access for non-admin', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        callbackQuery: { data: 'cancel_order-uuid-1' },
+        answerCbQuery: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'CLIENT',
+      });
+
+      await adminBotUpdate.onCancelOrder(mockCtx);
+
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('❌ Нет доступа');
     });
   });
 
@@ -320,6 +378,24 @@ describe('AdminBotUpdate', () => {
       );
       expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('🎉 Заказ завершен');
     });
+
+    it('should deny access for non-admin', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        callbackQuery: { data: 'complete_order-uuid-1' },
+        answerCbQuery: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'CLIENT',
+      });
+
+      await adminBotUpdate.onCompleteOrder(mockCtx);
+
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('❌ Нет доступа');
+    });
   });
 
   describe('onToggleProduct', () => {
@@ -351,6 +427,70 @@ describe('AdminBotUpdate', () => {
       });
       expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('❌ Товар деактивирован');
     });
+
+    it('should deny access for non-admin', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        callbackQuery: { data: 'toggle_product-uuid-1' },
+        answerCbQuery: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'CLIENT',
+      });
+
+      await adminBotUpdate.onToggleProduct(mockCtx);
+
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('❌ Нет доступа');
+    });
+
+    it('should handle product not found', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        callbackQuery: { data: 'toggle_product-uuid-1' },
+        answerCbQuery: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      mockPrismaService.product.findUnique.mockResolvedValue(null);
+
+      await adminBotUpdate.onToggleProduct(mockCtx);
+
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('Товар не найден');
+    });
+  });
+
+  describe('onAddStock', () => {
+    it('should show "in development" message', async () => {
+      const mockCtx = {
+        callbackQuery: { data: 'add_stock_product-uuid-1' },
+        answerCbQuery: jest.fn(),
+      } as any;
+
+      await adminBotUpdate.onAddStock(mockCtx);
+
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('Функция в разработке');
+    });
+  });
+
+  describe('onRemoveStock', () => {
+    it('should show "in development" message', async () => {
+      const mockCtx = {
+        callbackQuery: { data: 'remove_stock_product-uuid-1' },
+        answerCbQuery: jest.fn(),
+      } as any;
+
+      await adminBotUpdate.onRemoveStock(mockCtx);
+
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('Функция в разработке');
+    });
   });
 
   describe('onEditPrice', () => {
@@ -375,6 +515,24 @@ describe('AdminBotUpdate', () => {
       expect(mockCtx.session.editingField).toBe('price');
       expect(mockCtx.reply).toHaveBeenCalledWith(expect.stringContaining('новую цену'));
     });
+
+    it('should deny access for non-admin', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        callbackQuery: { data: 'edit_price_product-uuid-1' },
+        answerCbQuery: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'CLIENT',
+      });
+
+      await adminBotUpdate.onEditPrice(mockCtx);
+
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('❌ Нет доступа');
+    });
   });
 
   describe('onEditStock', () => {
@@ -398,6 +556,24 @@ describe('AdminBotUpdate', () => {
       expect(mockCtx.session.editingProduct).toBe('product-uuid-1');
       expect(mockCtx.session.editingField).toBe('stock');
       expect(mockCtx.reply).toHaveBeenCalledWith(expect.stringContaining('новое количество'));
+    });
+
+    it('should deny access for non-admin', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        callbackQuery: { data: 'edit_stock_product-uuid-1' },
+        answerCbQuery: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'CLIENT',
+      });
+
+      await adminBotUpdate.onEditStock(mockCtx);
+
+      expect(mockCtx.answerCbQuery).toHaveBeenCalledWith('❌ Нет доступа');
     });
   });
 
@@ -495,6 +671,65 @@ describe('AdminBotUpdate', () => {
       await adminBotUpdate.onText(mockCtx);
 
       expect(mockCtx.reply).toHaveBeenCalledWith('Нет отклоненных заказов.');
+    });
+
+    it('should show cancelled orders list with details', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: '❌ Отклоненные заказы' },
+        session: {},
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      mockPrismaService.order.findMany.mockResolvedValue([
+        {
+          id: 'order-uuid-1',
+          user: {
+            username: 'testuser',
+            phone: '+375291234567',
+          },
+          address: 'Минск',
+          totalAmount: 10.5,
+          orderItems: [
+            {
+              product: { name: 'Помидоры' },
+              quantity: 2,
+            },
+          ],
+        },
+      ]);
+
+      await adminBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith(expect.stringContaining('testuser'));
+      expect(mockCtx.reply).toHaveBeenCalledWith(expect.stringContaining('Помидоры'));
+    });
+
+    it('should show empty message when no products for edit', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: '✏️ Изменить товар' },
+        session: {},
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      mockPrismaService.product.findMany.mockResolvedValue([]);
+
+      await adminBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith('Товары отсутствуют.');
     });
 
     it('should show "in development" for add product', async () => {
@@ -648,6 +883,32 @@ describe('AdminBotUpdate', () => {
       );
     });
 
+    it('should handle product not found when editing', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: '5.50' },
+        session: {
+          editingProduct: 'product-uuid-1',
+          editingField: 'price',
+        },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      mockPrismaService.product.findUnique.mockResolvedValue(null);
+
+      await adminBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith('❌ Товар не найден.');
+      expect(mockCtx.session.editingProduct).toBeUndefined();
+      expect(mockCtx.session.editingField).toBeUndefined();
+    });
+
     it('should reject invalid stock format', async () => {
       const mockCtx = {
         from: { id: 123456 },
@@ -674,6 +935,196 @@ describe('AdminBotUpdate', () => {
 
       expect(mockCtx.reply).toHaveBeenCalledWith(
         expect.stringContaining('Неверный формат количества'),
+      );
+    });
+
+    it('should handle product name input when adding product', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: 'Огурцы' },
+        session: {
+          addingProduct: { step: 'name' },
+        },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      await adminBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.session.addingProduct).toEqual({
+        step: 'price',
+        name: 'Огурцы',
+      });
+      expect(mockCtx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('Шаг 2/3: Введите цену'),
+      );
+    });
+
+    it('should reject too short product name', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: 'А' },
+        session: {
+          addingProduct: { step: 'name' },
+        },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      await adminBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('Название слишком короткое'),
+      );
+    });
+
+    it('should handle product price input when adding product', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: '5.50' },
+        session: {
+          addingProduct: { step: 'price', name: 'Огурцы' },
+        },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      await adminBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.session.addingProduct).toEqual({
+        step: 'stock',
+        name: 'Огурцы',
+        price: 5.5,
+      });
+      expect(mockCtx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('Шаг 3/3: Введите количество'),
+      );
+    });
+
+    it('should reject invalid price when adding product', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: '-5' },
+        session: {
+          addingProduct: { step: 'price', name: 'Огурцы' },
+        },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      await adminBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('Неверный формат цены'),
+      );
+    });
+
+    it('should create product when stock input is valid', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: '50' },
+        session: {
+          addingProduct: { step: 'stock', name: 'Огурцы', price: 5.5 },
+        },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      mockPrismaService.product.create.mockResolvedValue({
+        id: 'new-product-uuid',
+        name: 'Огурцы',
+        price: 5.5,
+        stock: 50,
+        isActive: true,
+      });
+
+      await adminBotUpdate.onText(mockCtx);
+
+      expect(mockPrismaService.product.create).toHaveBeenCalledWith({
+        data: {
+          name: 'Огурцы',
+          price: 5.5,
+          stock: 50,
+          isActive: true,
+        },
+      });
+      expect(mockCtx.session.addingProduct).toBeUndefined();
+      expect(mockCtx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('✅ Товар успешно добавлен'),
+        expect.any(Object),
+      );
+    });
+
+    it('should reject negative stock when adding product', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: '-10' },
+        session: {
+          addingProduct: { step: 'stock', name: 'Огурцы', price: 5.5 },
+        },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      await adminBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('Неверный формат количества'),
+      );
+    });
+
+    it('should cancel adding product when cancel button clicked', async () => {
+      const mockCtx = {
+        from: { id: 123456 },
+        message: { text: '❌ Отменить' },
+        session: {
+          addingProduct: { step: 'price', name: 'Огурцы' },
+        },
+        reply: jest.fn(),
+      } as any;
+
+      mockPrismaService.user.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        telegramId: '123456',
+        role: 'ADMIN',
+      });
+
+      await adminBotUpdate.onText(mockCtx);
+
+      expect(mockCtx.session.addingProduct).toBeUndefined();
+      expect(mockCtx.reply).toHaveBeenCalledWith(
+        expect.stringContaining('Добавление товара отменено'),
+        expect.any(Object),
       );
     });
 

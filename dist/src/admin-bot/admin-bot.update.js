@@ -55,16 +55,26 @@ let AdminBotUpdate = class AdminBotUpdate {
         const telegramId = ctx.from?.id.toString();
         if (!telegramId)
             return;
-        const user = await this.prisma.user.findUnique({
+        let user = await this.prisma.user.findUnique({
             where: { telegramId },
         });
-        if (!user || user.role !== 'ADMIN') {
+        if (!user) {
+            user = await this.prisma.user.create({
+                data: {
+                    telegramId,
+                    username: ctx.from?.username,
+                    role: 'ADMIN',
+                },
+            });
+        }
+        if (user.role !== 'ADMIN') {
             await ctx.reply('❌ У вас нет доступа к админ-панели.');
             return;
         }
         await ctx.reply('🔧 Админ-панель\n\nВыберите действие:', telegraf_1.Markup.keyboard([
-            ['📦 Управление товарами'],
-            ['📋 Активные заказы'],
+            ['📦 Товары на складе'],
+            ['✅ Принятые заказы', '❌ Отклоненные заказы'],
+            ['➕ Добавить товар', '✏️ Изменить товар'],
         ]).resize());
     }
     async onStockCommand(ctx) {
@@ -106,11 +116,243 @@ let AdminBotUpdate = class AdminBotUpdate {
             return;
         }
         const text = ctx.message.text;
-        if (text === '📋 Активные заказы') {
-            await this.showActiveOrders(ctx);
+        if (ctx.session.addingProduct) {
+            await this.handleProductAdd(ctx, text);
+            return;
         }
-        else if (text === '📦 Управление товарами') {
-            await this.showProducts(ctx);
+        if (ctx.session.editingProduct && ctx.session.editingField) {
+            await this.handleProductEdit(ctx, text);
+            return;
+        }
+        if (text === '📦 Товары на складе') {
+            await this.showStockList(ctx);
+        }
+        else if (text === '✅ Принятые заказы') {
+            await this.showAcceptedOrders(ctx);
+        }
+        else if (text === '❌ Отклоненные заказы') {
+            await this.showCancelledOrders(ctx);
+        }
+        else if (text === '➕ Добавить товар') {
+            await this.startAddingProduct(ctx);
+        }
+        else if (text === '✏️ Изменить товар') {
+            await this.showProductsForEdit(ctx);
+        }
+    }
+    async handleProductEdit(ctx, input) {
+        const productId = ctx.session.editingProduct;
+        const field = ctx.session.editingField;
+        if (!productId || !field)
+            return;
+        const product = await this.prisma.product.findUnique({
+            where: { id: productId },
+        });
+        if (!product) {
+            await ctx.reply('❌ Товар не найден.');
+            delete ctx.session.editingProduct;
+            delete ctx.session.editingField;
+            return;
+        }
+        if (field === 'price') {
+            const price = parseFloat(input);
+            if (isNaN(price) || price <= 0) {
+                await ctx.reply('❌ Неверный формат цены. Введите число (например: 3.50):');
+                return;
+            }
+            await this.prisma.product.update({
+                where: { id: productId },
+                data: { price },
+            });
+            await ctx.reply(`✅ Цена товара "${product.name}" обновлена: ${price} BYN`);
+        }
+        else if (field === 'stock') {
+            const stock = parseInt(input, 10);
+            if (isNaN(stock) || stock < 0) {
+                await ctx.reply('❌ Неверный формат количества. Введите целое число (например: 100):');
+                return;
+            }
+            await this.prisma.product.update({
+                where: { id: productId },
+                data: { stock },
+            });
+            await ctx.reply(`✅ Остаток товара "${product.name}" обновлен: ${stock} шт.`);
+        }
+        delete ctx.session.editingProduct;
+        delete ctx.session.editingField;
+    }
+    async startAddingProduct(ctx) {
+        ctx.session.addingProduct = {
+            step: 'name',
+        };
+        await ctx.reply('➕ Добавление нового товара\n\n' +
+            'Шаг 1/3: Введите название товара (например: Помидоры):', telegraf_1.Markup.keyboard([['❌ Отменить']]).resize());
+    }
+    async handleProductAdd(ctx, input) {
+        if (input === '❌ Отменить') {
+            delete ctx.session.addingProduct;
+            await ctx.reply('❌ Добавление товара отменено.', telegraf_1.Markup.keyboard([
+                ['📦 Товары на складе'],
+                ['✅ Принятые заказы', '❌ Отклоненные заказы'],
+                ['➕ Добавить товар', '✏️ Изменить товар'],
+            ]).resize());
+            return;
+        }
+        const addingProduct = ctx.session.addingProduct;
+        if (!addingProduct)
+            return;
+        if (addingProduct.step === 'name') {
+            if (input.trim().length < 2) {
+                await ctx.reply('❌ Название слишком короткое. Введите минимум 2 символа:');
+                return;
+            }
+            addingProduct.name = input.trim();
+            addingProduct.step = 'price';
+            await ctx.reply('Шаг 2/3: Введите цену товара в BYN (например: 3.50):');
+        }
+        else if (addingProduct.step === 'price') {
+            const price = parseFloat(input);
+            if (isNaN(price) || price <= 0) {
+                await ctx.reply('❌ Неверный формат цены. Введите число больше 0 (например: 3.50):');
+                return;
+            }
+            addingProduct.price = price;
+            addingProduct.step = 'stock';
+            await ctx.reply('Шаг 3/3: Введите количество товара на складе (например: 100):');
+        }
+        else if (addingProduct.step === 'stock') {
+            const stock = parseInt(input, 10);
+            if (isNaN(stock) || stock < 0) {
+                await ctx.reply('❌ Неверный формат количества. Введите целое число >= 0 (например: 100):');
+                return;
+            }
+            addingProduct.stock = stock;
+            const product = await this.prisma.product.create({
+                data: {
+                    name: addingProduct.name,
+                    price: addingProduct.price,
+                    stock: addingProduct.stock,
+                    isActive: true,
+                },
+            });
+            delete ctx.session.addingProduct;
+            await ctx.reply(`✅ Товар успешно добавлен!\n\n` +
+                `📦 ${product.name}\n` +
+                `💰 Цена: ${product.price} BYN\n` +
+                `📦 Остаток: ${product.stock} шт.\n` +
+                `Статус: ✅ Активен`, telegraf_1.Markup.keyboard([
+                ['📦 Товары на складе'],
+                ['✅ Принятые заказы', '❌ Отклоненные заказы'],
+                ['➕ Добавить товар', '✏️ Изменить товар'],
+            ]).resize());
+        }
+    }
+    async showStockList(ctx) {
+        const products = await this.prisma.product.findMany({
+            orderBy: { name: 'asc' },
+        });
+        if (products.length === 0) {
+            await ctx.reply('Товары отсутствуют.');
+            return;
+        }
+        let stockText = '📦 Товары на складе:\n\n';
+        for (const product of products) {
+            const status = product.isActive ? '✅' : '❌';
+            stockText += `${status} ${product.name}\n`;
+            stockText += `💰 Цена: ${product.price} BYN\n`;
+            stockText += `📦 Остаток: ${product.stock} шт.\n\n`;
+        }
+        await ctx.reply(stockText);
+    }
+    async showAcceptedOrders(ctx) {
+        const orders = await this.prisma.order.findMany({
+            where: { status: 'ACCEPTED' },
+            include: {
+                user: true,
+                orderItems: {
+                    include: {
+                        product: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+        });
+        if (orders.length === 0) {
+            await ctx.reply('Нет принятых заказов.');
+            return;
+        }
+        for (const order of orders) {
+            let orderText = `✅ Заказ #${order.id.slice(0, 8)}\n`;
+            orderText += `👤 Клиент: ${order.user.username || 'Без имени'}\n`;
+            orderText += `📞 Телефон: ${order.user.phone || 'Не указан'}\n`;
+            orderText += `📍 Адрес: ${order.address}\n\n`;
+            orderText += `📦 Товары:\n`;
+            for (const item of order.orderItems) {
+                orderText += `- ${item.product.name} x${item.quantity}\n`;
+            }
+            orderText += `\n💰 Итого: ${order.totalAmount} BYN`;
+            const buttons = telegraf_1.Markup.inlineKeyboard([
+                [telegraf_1.Markup.button.callback('🎉 Завершить', `complete_${order.id}`)],
+            ]);
+            await ctx.reply(orderText, buttons);
+        }
+    }
+    async showCancelledOrders(ctx) {
+        const orders = await this.prisma.order.findMany({
+            where: { status: 'CANCELLED' },
+            include: {
+                user: true,
+                orderItems: {
+                    include: {
+                        product: true,
+                    },
+                },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+        });
+        if (orders.length === 0) {
+            await ctx.reply('Нет отклоненных заказов.');
+            return;
+        }
+        for (const order of orders) {
+            let orderText = `❌ Заказ #${order.id.slice(0, 8)}\n`;
+            orderText += `👤 Клиент: ${order.user.username || 'Без имени'}\n`;
+            orderText += `📞 Телефон: ${order.user.phone || 'Не указан'}\n`;
+            orderText += `📍 Адрес: ${order.address}\n\n`;
+            orderText += `📦 Товары:\n`;
+            for (const item of order.orderItems) {
+                orderText += `- ${item.product.name} x${item.quantity}\n`;
+            }
+            orderText += `\n💰 Итого: ${order.totalAmount} BYN`;
+            await ctx.reply(orderText);
+        }
+    }
+    async showProductsForEdit(ctx) {
+        const products = await this.prisma.product.findMany({
+            orderBy: { name: 'asc' },
+        });
+        if (products.length === 0) {
+            await ctx.reply('Товары отсутствуют.');
+            return;
+        }
+        await ctx.reply('Выберите товар для редактирования:');
+        for (const product of products) {
+            const status = product.isActive ? '✅' : '❌';
+            let productText = `${status} ${product.name}\n`;
+            productText += `💰 Цена: ${product.price} BYN\n`;
+            productText += `📦 Остаток: ${product.stock} шт.`;
+            const buttons = telegraf_1.Markup.inlineKeyboard([
+                [
+                    telegraf_1.Markup.button.callback('💰 Изменить цену', `edit_price_${product.id}`),
+                    telegraf_1.Markup.button.callback('📦 Изменить остаток', `edit_stock_${product.id}`),
+                ],
+                [
+                    telegraf_1.Markup.button.callback(product.isActive ? '❌ Деактивировать' : '✅ Активировать', `toggle_${product.id}`),
+                ],
+            ]);
+            await ctx.reply(productText, buttons);
         }
     }
     async showActiveOrders(ctx) {
@@ -187,7 +429,7 @@ let AdminBotUpdate = class AdminBotUpdate {
             await ctx.reply(productText, buttons);
         }
     }
-    async onCallbackQuery(ctx) {
+    async onAcceptOrder(ctx) {
         const callbackQuery = ctx.callbackQuery;
         if (!callbackQuery || !('data' in callbackQuery))
             return;
@@ -201,25 +443,105 @@ let AdminBotUpdate = class AdminBotUpdate {
             await ctx.answerCbQuery('❌ Нет доступа');
             return;
         }
-        const data = callbackQuery.data;
-        if (data.startsWith('accept_')) {
-            await this.handleOrderAction(ctx, data.replace('accept_', ''), 'ACCEPTED');
+        const orderId = callbackQuery.data.replace('accept_', '');
+        await this.handleOrderAction(ctx, orderId, 'ACCEPTED');
+    }
+    async onCancelOrder(ctx) {
+        const callbackQuery = ctx.callbackQuery;
+        if (!callbackQuery || !('data' in callbackQuery))
+            return;
+        const telegramId = ctx.from?.id.toString();
+        if (!telegramId)
+            return;
+        const user = await this.prisma.user.findUnique({
+            where: { telegramId },
+        });
+        if (!user || user.role !== 'ADMIN') {
+            await ctx.answerCbQuery('❌ Нет доступа');
+            return;
         }
-        else if (data.startsWith('cancel_')) {
-            await this.handleOrderAction(ctx, data.replace('cancel_', ''), 'CANCELLED');
+        const orderId = callbackQuery.data.replace('cancel_', '');
+        await this.handleOrderAction(ctx, orderId, 'CANCELLED');
+    }
+    async onCompleteOrder(ctx) {
+        const callbackQuery = ctx.callbackQuery;
+        if (!callbackQuery || !('data' in callbackQuery))
+            return;
+        const telegramId = ctx.from?.id.toString();
+        if (!telegramId)
+            return;
+        const user = await this.prisma.user.findUnique({
+            where: { telegramId },
+        });
+        if (!user || user.role !== 'ADMIN') {
+            await ctx.answerCbQuery('❌ Нет доступа');
+            return;
         }
-        else if (data.startsWith('complete_')) {
-            await this.handleOrderAction(ctx, data.replace('complete_', ''), 'COMPLETED');
+        const orderId = callbackQuery.data.replace('complete_', '');
+        await this.handleOrderAction(ctx, orderId, 'COMPLETED');
+    }
+    async onToggleProduct(ctx) {
+        const callbackQuery = ctx.callbackQuery;
+        if (!callbackQuery || !('data' in callbackQuery))
+            return;
+        const telegramId = ctx.from?.id.toString();
+        if (!telegramId)
+            return;
+        const user = await this.prisma.user.findUnique({
+            where: { telegramId },
+        });
+        if (!user || user.role !== 'ADMIN') {
+            await ctx.answerCbQuery('❌ Нет доступа');
+            return;
         }
-        else if (data.startsWith('toggle_')) {
-            await this.handleToggleProduct(ctx, data.replace('toggle_', ''));
+        const productId = callbackQuery.data.replace('toggle_', '');
+        await this.handleToggleProduct(ctx, productId);
+    }
+    async onAddStock(ctx) {
+        await ctx.answerCbQuery('Функция в разработке');
+    }
+    async onRemoveStock(ctx) {
+        await ctx.answerCbQuery('Функция в разработке');
+    }
+    async onEditPrice(ctx) {
+        const callbackQuery = ctx.callbackQuery;
+        if (!callbackQuery || !('data' in callbackQuery))
+            return;
+        const telegramId = ctx.from?.id.toString();
+        if (!telegramId)
+            return;
+        const user = await this.prisma.user.findUnique({
+            where: { telegramId },
+        });
+        if (!user || user.role !== 'ADMIN') {
+            await ctx.answerCbQuery('❌ Нет доступа');
+            return;
         }
-        else if (data.startsWith('add_stock_')) {
-            await ctx.answerCbQuery('Функция в разработке');
+        const productId = callbackQuery.data.replace('edit_price_', '');
+        ctx.session.editingProduct = productId;
+        ctx.session.editingField = 'price';
+        await ctx.answerCbQuery();
+        await ctx.reply('💰 Введите новую цену (например: 3.50):');
+    }
+    async onEditStock(ctx) {
+        const callbackQuery = ctx.callbackQuery;
+        if (!callbackQuery || !('data' in callbackQuery))
+            return;
+        const telegramId = ctx.from?.id.toString();
+        if (!telegramId)
+            return;
+        const user = await this.prisma.user.findUnique({
+            where: { telegramId },
+        });
+        if (!user || user.role !== 'ADMIN') {
+            await ctx.answerCbQuery('❌ Нет доступа');
+            return;
         }
-        else if (data.startsWith('remove_stock_')) {
-            await ctx.answerCbQuery('Функция в разработке');
-        }
+        const productId = callbackQuery.data.replace('edit_stock_', '');
+        ctx.session.editingProduct = productId;
+        ctx.session.editingField = 'stock';
+        await ctx.answerCbQuery();
+        await ctx.reply('📦 Введите новое количество (например: 100):');
     }
     async handleOrderAction(ctx, orderId, newStatus) {
         const order = await this.prisma.order.findUnique({
@@ -278,11 +600,53 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], AdminBotUpdate.prototype, "onText", null);
 __decorate([
-    (0, nestjs_telegraf_1.On)('callback_query'),
+    (0, nestjs_telegraf_1.Action)(/^accept_/),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
-], AdminBotUpdate.prototype, "onCallbackQuery", null);
+], AdminBotUpdate.prototype, "onAcceptOrder", null);
+__decorate([
+    (0, nestjs_telegraf_1.Action)(/^cancel_/),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AdminBotUpdate.prototype, "onCancelOrder", null);
+__decorate([
+    (0, nestjs_telegraf_1.Action)(/^complete_/),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AdminBotUpdate.prototype, "onCompleteOrder", null);
+__decorate([
+    (0, nestjs_telegraf_1.Action)(/^toggle_/),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AdminBotUpdate.prototype, "onToggleProduct", null);
+__decorate([
+    (0, nestjs_telegraf_1.Action)(/^add_stock_/),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AdminBotUpdate.prototype, "onAddStock", null);
+__decorate([
+    (0, nestjs_telegraf_1.Action)(/^remove_stock_/),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AdminBotUpdate.prototype, "onRemoveStock", null);
+__decorate([
+    (0, nestjs_telegraf_1.Action)(/^edit_price_/),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AdminBotUpdate.prototype, "onEditPrice", null);
+__decorate([
+    (0, nestjs_telegraf_1.Action)(/^edit_stock_/),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], AdminBotUpdate.prototype, "onEditStock", null);
 exports.AdminBotUpdate = AdminBotUpdate = __decorate([
     (0, nestjs_telegraf_1.Update)(),
     __param(0, (0, nestjs_telegraf_1.InjectBot)('admin')),
