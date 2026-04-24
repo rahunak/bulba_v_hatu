@@ -203,6 +203,13 @@ export class ClientBotUpdate {
         orders: {
           orderBy: { createdAt: 'desc' },
           take: 5,
+          include: {
+            orderItems: {
+              include: {
+                product: true,
+              },
+            },
+          },
         },
       },
     });
@@ -223,8 +230,17 @@ export class ClientBotUpdate {
       }[order.status];
 
       ordersText += `${statusEmoji} Заказ #${order.id.slice(0, 8)}\n`;
-      ordersText += `Сумма: ${order.totalAmount} BYN\n`;
-      ordersText += `Статус: ${order.status}\n\n`;
+      ordersText += `Дата: ${order.createdAt.toLocaleDateString('ru-RU')}\n`;
+      ordersText += `Статус: ${order.status}\n`;
+      ordersText += `📍 Адрес: ${order.address}\n\n`;
+
+      ordersText += `📦 Товары:\n`;
+      for (const item of order.orderItems) {
+        ordersText += `  • ${item.product.name} x${item.quantity} = ${(Number(item.price) * item.quantity).toFixed(2)} BYN\n`;
+      }
+
+      ordersText += `\n💰 Итого: ${order.totalAmount} BYN\n\n`;
+      ordersText += '─────────────────\n\n';
     }
 
     await ctx.reply(ordersText);

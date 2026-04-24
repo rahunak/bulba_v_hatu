@@ -7,6 +7,7 @@ import { SessionMiddleware } from './common/middleware/session.middleware';
 import { ClientBotModule } from './client-bot/client-bot.module';
 import { AdminBotModule } from './admin-bot/admin-bot.module';
 import { BotLauncherService } from './common/services/bot-launcher.service';
+import { OrderExpirationService } from './common/services/order-expiration.service';
 
 @Module({
   imports: [
@@ -36,6 +37,6 @@ import { BotLauncherService } from './common/services/bot-launcher.service';
     ClientBotModule,
     AdminBotModule,
   ],
-  providers: [BotLauncherService],
+  providers: [BotLauncherService, OrderExpirationService],
 })
 export class AppModule {}
