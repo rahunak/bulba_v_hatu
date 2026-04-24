@@ -1,6 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
-import { Decimal } from '@prisma/client/runtime/library';
 
 @Controller()
 export class AppController {
@@ -24,9 +23,9 @@ export class AppController {
     const uptime = process.uptime();
     const uptimeFormatted = `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.floor(uptime % 60)}s`;
 
-    let products: Array<{ name: string; stock: number; price: Decimal }> = [];
+    const productsList: string[] = [];
     try {
-      products = await this.prisma.product.findMany({
+      const products = await this.prisma.product.findMany({
         where: { stock: { gt: 0 } },
         select: {
           name: true,
@@ -35,8 +34,10 @@ export class AppController {
         },
         orderBy: { name: 'asc' },
       });
+
+      productsList.push(...products.map(p => `${p.name} - ${p.stock} шт. (${Number(p.price)})`));
     } catch (error) {
-      products = [];
+      // products list stays empty
     }
 
     return {
@@ -50,7 +51,7 @@ export class AppController {
       },
       environment: process.env.NODE_ENV || 'development',
       version: '1.0.0',
-      products: products.map(p => `${p.name} - ${p.stock} шт. (${p.price.toNumber()})`),
+      products: productsList,
     };
   }
 
