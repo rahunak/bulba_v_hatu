@@ -125,7 +125,7 @@ export class AdminBotUpdate {
       const status = product.isActive ? '✅' : '❌';
       stockText += `${status} ${product.name}\n`;
       stockText += `💰 Цена: ${product.price} BYN\n`;
-      stockText += `📦 Остаток: ${product.stock} шт.\n\n`;
+      stockText += `📦 Остаток: ${product.stock} кг.\n\n`;
     }
 
     await ctx.reply(stockText);
@@ -256,7 +256,7 @@ export class AdminBotUpdate {
       });
 
       this.logger.log(`[PRODUCT_EDIT] Admin ${telegramId} updated stock for product ${productId}: ${stock} units`);
-      await ctx.reply(`✅ Остаток товара "${product.name}" обновлен: ${stock} шт.`);
+      await ctx.reply(`✅ Остаток товара "${product.name}" обновлен: ${stock} кг.`);
     }
 
     delete ctx.session.editingProduct;
@@ -351,7 +351,7 @@ export class AdminBotUpdate {
         `✅ Товар успешно добавлен!\n\n` +
         `📦 ${product.name}\n` +
         `💰 Цена: ${product.price} BYN\n` +
-        `📦 Остаток: ${product.stock} шт.\n` +
+        `📦 Остаток: ${product.stock} кг.\n` +
         `Статус: ✅ Активен`,
         Markup.keyboard([
           ['📦 Товары на складе'],
@@ -381,7 +381,7 @@ export class AdminBotUpdate {
       const status = product.isActive ? '✅' : '❌';
       stockText += `${status} ${product.name}\n`;
       stockText += `💰 Цена: ${product.price} BYN\n`;
-      stockText += `📦 Остаток: ${product.stock} шт.\n\n`;
+      stockText += `📦 Остаток: ${product.stock} кг.\n\n`;
     }
 
     await ctx.reply(stockText);
@@ -490,7 +490,7 @@ export class AdminBotUpdate {
       const status = product.isActive ? '✅' : '❌';
       let productText = `${status} ${product.name}\n`;
       productText += `💰 Цена: ${product.price} BYN\n`;
-      productText += `📦 Остаток: ${product.stock} шт.`;
+      productText += `📦 Остаток: ${product.stock} кг.`;
 
       const buttons = Markup.inlineKeyboard([
         [
@@ -578,7 +578,7 @@ export class AdminBotUpdate {
       const status = product.isActive ? '✅ Активен' : '❌ Неактивен';
       let productText = `${product.name}\n`;
       productText += `💰 Цена: ${product.price} BYN\n`;
-      productText += `📦 Остаток: ${product.stock} шт.\n`;
+      productText += `📦 Остаток: ${product.stock} кг.\n`;
       productText += `Статус: ${status}`;
 
       const buttons = Markup.inlineKeyboard([

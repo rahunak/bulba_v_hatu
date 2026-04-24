@@ -119,11 +119,11 @@ export class ClientBotUpdate {
       const cartItem = cart.find((item) => item.productId === product.id);
 
       let buttons;
-      let text = `${product.name}\n💰 Цена: ${product.price} BYN\n📦 В наличии: ${product.stock} шт.`;
+      let text = `${product.name}\n💰 Цена: ${product.price} BYN\n📦 В наличии: ${product.stock} кг.`;
 
       if (cartItem) {
         const itemTotal = Number(product.price) * cartItem.quantity;
-        text += `\n🛒 В корзине: ${cartItem.quantity} шт.`;
+        text += `\n🛒 В корзине: ${cartItem.quantity} кг.`;
         text += `\n💵 Сумма: ${itemTotal.toFixed(2)} BYN`;
 
         // Показываем предупреждение, если достигнут максимум
@@ -402,7 +402,7 @@ export class ClientBotUpdate {
     // Проверяем, не превышает ли новое количество остаток на складе
     if (currentQuantity >= product.stock) {
       this.logger.warn(`[CART] User ${telegramId} tried to add more than available stock for product ${productId}`);
-      await ctx.answerCbQuery(`⚠️ Достигнут максимум! В наличии только ${product.stock} шт.`, { show_alert: true });
+      await ctx.answerCbQuery(`⚠️ Достигнут максимум! В наличии только ${product.stock} кг.`, { show_alert: true });
       return;
     }
 
@@ -419,11 +419,11 @@ export class ClientBotUpdate {
     // Update the message with new buttons
     if ('message' in callbackQuery) {
       const cartItem = ctx.session.cart.find((item) => item.productId === productId);
-      let text = `${product.name}\n💰 Цена: ${product.price} BYN\n📦 В наличии: ${product.stock} шт.`;
+      let text = `${product.name}\n💰 Цена: ${product.price} BYN\n📦 В наличии: ${product.stock} кг.`;
 
       if (cartItem) {
         const itemTotal = Number(product.price) * cartItem.quantity;
-        text += `\n🛒 В корзине: ${cartItem.quantity} шт.`;
+        text += `\n🛒 В корзине: ${cartItem.quantity} кг.`;
         text += `\n💵 Сумма: ${itemTotal.toFixed(2)} BYN`;
 
         // Показываем предупреждение, если достигнут максимум
@@ -494,12 +494,12 @@ export class ClientBotUpdate {
 
     if (product && 'message' in callbackQuery) {
       const cartItem = ctx.session.cart.find((item) => item.productId === productId);
-      let text = `${product.name}\n💰 Цена: ${product.price} BYN\n📦 В наличии: ${product.stock} шт.`;
+      let text = `${product.name}\n💰 Цена: ${product.price} BYN\n📦 В наличии: ${product.stock} кг.`;
 
       let buttons;
       if (cartItem) {
         const itemTotal = Number(product.price) * cartItem.quantity;
-        text += `\n🛒 В корзине: ${cartItem.quantity} шт.`;
+        text += `\n🛒 В корзине: ${cartItem.quantity} кг.`;
         text += `\n💵 Сумма: ${itemTotal.toFixed(2)} BYN`;
 
         // Показываем предупреждение, если достигнут максимум

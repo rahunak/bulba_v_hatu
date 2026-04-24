@@ -35,7 +35,7 @@ export class AppController {
         orderBy: { name: 'asc' },
       });
 
-      productsList.push(...products.map(p => `${p.name} - ${p.stock} шт. (${Number(p.price)})`));
+      productsList.push(...products.map(p => `${p.name} - ${p.stock} кг. (${Number(p.price)})`));
     } catch (error) {
       // products list stays empty
     }
