@@ -12,11 +12,11 @@ async function main() {
 
   // Создаем админа (замените telegramId на ваш реальный ID)
   const admin = await prisma.user.upsert({
-    where: { telegramId: '123456789' },
+    where: { telegramId: '5151069944' },
     update: {},
     create: {
-      telegramId: '123456789',
-      username: 'admin',
+      telegramId: '5151069944',
+      username: 'rahunak',
       role: 'ADMIN',
     },
   });

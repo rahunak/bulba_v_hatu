@@ -5,6 +5,8 @@ export interface SessionData {
   orderStep?: string;
   phone?: string;
   address?: string;
+  editingProduct?: string;
+  editingField?: 'price' | 'stock';
   [key: string]: unknown;
 }
 

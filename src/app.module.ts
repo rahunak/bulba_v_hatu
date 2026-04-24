@@ -6,6 +6,7 @@ import { SessionModule } from './common/middleware/session.module';
 import { SessionMiddleware } from './common/middleware/session.middleware';
 import { ClientBotModule } from './client-bot/client-bot.module';
 import { AdminBotModule } from './admin-bot/admin-bot.module';
+import { BotLauncherService } from './common/services/bot-launcher.service';
 
 @Module({
   imports: [
@@ -17,6 +18,8 @@ import { AdminBotModule } from './admin-bot/admin-bot.module';
       useFactory: (config: ConfigService, sessionMiddleware: SessionMiddleware) => ({
         token: config.get<string>('CLIENT_BOT_TOKEN') || '',
         middlewares: [sessionMiddleware.middleware()],
+        launchOptions: false,
+        include: [ClientBotModule],
       }),
       inject: [ConfigService, SessionMiddleware],
     }),
@@ -25,11 +28,14 @@ import { AdminBotModule } from './admin-bot/admin-bot.module';
       useFactory: (config: ConfigService, sessionMiddleware: SessionMiddleware) => ({
         token: config.get<string>('ADMIN_BOT_TOKEN') || '',
         middlewares: [sessionMiddleware.middleware()],
+        launchOptions: false,
+        include: [AdminBotModule],
       }),
       inject: [ConfigService, SessionMiddleware],
     }),
     ClientBotModule,
     AdminBotModule,
   ],
+  providers: [BotLauncherService],
 })
 export class AppModule {}

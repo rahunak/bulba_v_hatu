@@ -19,7 +19,7 @@ enum OrderStatus {
 }
 
 model User {
-  id         String   @id @default(cuid())
+  id         String   @id @default(uuid()) @db.Uuid
   telegramId String   @unique
   username   String?
   phone      String?
@@ -29,7 +29,7 @@ model User {
 }
 
 model Product {
-  id         String      @id @default(cuid())
+  id         String      @id @default(uuid()) @db.Uuid
   name       String
   price      Decimal     @db.Decimal(10, 2)
   stock      Int
@@ -40,8 +40,8 @@ model Product {
 }
 
 model Order {
-  id          String      @id @default(cuid())
-  userId      String
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String      @db.Uuid
   user        User        @relation(fields: [userId], references: [id])
   address     String
   totalAmount Decimal     @db.Decimal(10, 2)
@@ -52,17 +52,17 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
+  id        String  @id @default(uuid()) @db.Uuid
+  orderId   String  @db.Uuid
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId String
+  productId String  @db.Uuid
   product   Product @relation(fields: [productId], references: [id])
   quantity  Int
   price     Decimal @db.Decimal(10, 2)
 }
 
 model Session {
-  id           String   @id @default(cuid())
+  id           String   @id @default(uuid()) @db.Uuid
   telegramId   String   @unique
   sessionData  Json
   updatedAt    DateTime @updatedAt
