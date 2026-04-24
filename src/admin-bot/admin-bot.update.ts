@@ -121,6 +121,12 @@ export class AdminBotUpdate {
 
     const text = (ctx.message as { text: string }).text;
 
+    // Проверяем, добавляет ли админ новый товар
+    if (ctx.session.addingProduct) {
+      await this.handleProductAdd(ctx, text);
+      return;
+    }
+
     // Проверяем, редактирует ли админ товар
     if (ctx.session.editingProduct && ctx.session.editingField) {
       await this.handleProductEdit(ctx, text);
@@ -134,7 +140,7 @@ export class AdminBotUpdate {
     } else if (text === '❌ Отклоненные заказы') {
       await this.showCancelledOrders(ctx);
     } else if (text === '➕ Добавить товар') {
-      await ctx.reply('Функция добавления товара в разработке.');
+      await this.startAddingProduct(ctx);
     } else if (text === '✏️ Изменить товар') {
       await this.showProductsForEdit(ctx);
     }
@@ -187,6 +193,92 @@ export class AdminBotUpdate {
 
     delete ctx.session.editingProduct;
     delete ctx.session.editingField;
+  }
+
+  private async startAddingProduct(ctx: BotContext): Promise<void> {
+    ctx.session.addingProduct = {
+      step: 'name',
+    };
+
+    await ctx.reply(
+      '➕ Добавление нового товара\n\n' +
+      'Шаг 1/3: Введите название товара (например: Помидоры):',
+      Markup.keyboard([['❌ Отменить']]).resize(),
+    );
+  }
+
+  private async handleProductAdd(ctx: BotContext, input: string): Promise<void> {
+    if (input === '❌ Отменить') {
+      delete ctx.session.addingProduct;
+      await ctx.reply(
+        '❌ Добавление товара отменено.',
+        Markup.keyboard([
+          ['📦 Товары на складе'],
+          ['✅ Принятые заказы', '❌ Отклоненные заказы'],
+          ['➕ Добавить товар', '✏️ Изменить товар'],
+        ]).resize(),
+      );
+      return;
+    }
+
+    const addingProduct = ctx.session.addingProduct;
+    if (!addingProduct) return;
+
+    if (addingProduct.step === 'name') {
+      if (input.trim().length < 2) {
+        await ctx.reply('❌ Название слишком короткое. Введите минимум 2 символа:');
+        return;
+      }
+
+      addingProduct.name = input.trim();
+      addingProduct.step = 'price';
+
+      await ctx.reply('Шаг 2/3: Введите цену товара в BYN (например: 3.50):');
+    } else if (addingProduct.step === 'price') {
+      const price = parseFloat(input);
+      if (isNaN(price) || price <= 0) {
+        await ctx.reply('❌ Неверный формат цены. Введите число больше 0 (например: 3.50):');
+        return;
+      }
+
+      addingProduct.price = price;
+      addingProduct.step = 'stock';
+
+      await ctx.reply('Шаг 3/3: Введите количество товара на складе (например: 100):');
+    } else if (addingProduct.step === 'stock') {
+      const stock = parseInt(input, 10);
+      if (isNaN(stock) || stock < 0) {
+        await ctx.reply('❌ Неверный формат количества. Введите целое число >= 0 (например: 100):');
+        return;
+      }
+
+      addingProduct.stock = stock;
+
+      // Создаем товар
+      const product = await this.prisma.product.create({
+        data: {
+          name: addingProduct.name!,
+          price: addingProduct.price!,
+          stock: addingProduct.stock!,
+          isActive: true,
+        },
+      });
+
+      delete ctx.session.addingProduct;
+
+      await ctx.reply(
+        `✅ Товар успешно добавлен!\n\n` +
+        `📦 ${product.name}\n` +
+        `💰 Цена: ${product.price} BYN\n` +
+        `📦 Остаток: ${product.stock} шт.\n` +
+        `Статус: ✅ Активен`,
+        Markup.keyboard([
+          ['📦 Товары на складе'],
+          ['✅ Принятые заказы', '❌ Отклоненные заказы'],
+          ['➕ Добавить товар', '✏️ Изменить товар'],
+        ]).resize(),
+      );
+    }
   }
 
   private async showStockList(ctx: BotContext): Promise<void> {
