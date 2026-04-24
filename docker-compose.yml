@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: veggie_bot_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: veggie_bot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: veggie_bot_app
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/veggie_bot?schema=public
+      CLIENT_BOT_TOKEN: ${CLIENT_BOT_TOKEN}
+      ADMIN_BOT_TOKEN: ${ADMIN_BOT_TOKEN}
+      RENDER_BACKEND_URL: ${RENDER_BACKEND_URL}
+      TELEGRAM_API_URL: https://api.telegram.org
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:

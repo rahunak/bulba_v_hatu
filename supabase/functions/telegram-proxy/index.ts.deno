@@ -1,0 +1,63 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+interface TelegramUpdate {
+  update_id: number;
+  message?: {
+    chat: {
+      id: number;
+    };
+  };
+  callback_query?: {
+    message: {
+      chat: {
+        id: number;
+      };
+    };
+  };
+}
+
+serve(async (req: Request) => {
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
+
+  try {
+    const update: TelegramUpdate = await req.json();
+
+    const chatId = update.message?.chat.id || update.callback_query?.message.chat.id;
+
+    if (chatId) {
+      const telegramApiUrl = Deno.env.get("TELEGRAM_API_URL") || "https://api.telegram.org";
+      const botToken = Deno.env.get("BOT_TOKEN");
+
+      if (botToken) {
+        fetch(`${telegramApiUrl}/bot${botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: "⏳ Сервер просыпается, подождите около 30 секунд...",
+          }),
+        }).catch(() => {});
+      }
+    }
+
+    const renderBackendUrl = Deno.env.get("RENDER_BACKEND_URL");
+    if (!renderBackendUrl) {
+      return new Response("RENDER_BACKEND_URL not configured", { status: 500 });
+    }
+
+    const forwardResponse = await fetch(renderBackendUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(update),
+    });
+
+    return new Response("OK", { status: 200 });
+  } catch (error) {
+    console.error("Proxy error:", error);
+    return new Response("OK", { status: 200 });
+  }
+});
